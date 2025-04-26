@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CT重建算法代码展示</title>
+    <meta charset="UTF-8">
+    <!-- 代码高亮库 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            line-height: 1.6;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            color: #333;
+        }
+        h1 {
+            color: #2c3e50;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+        }
+        pre {
+            background: #282c34;
+            border-radius: 8px;
+            padding: 15px;
+            overflow-x: auto;
+        }
+        code {
+            font-family: 'Courier New', monospace;
+        }
+        .code-block {
+            margin: 20px 0;
+        }
+        .language-python {
+            color: #abb2bf;
+        }
+    </style>
+</head>
+<body>
+    <h1>CT重建算法代码集</h1>
+    
+    <div class="code-block">
+        <h2>1. 滤波反投影(FBP)</h2>
+        <pre><code class="language-python"># 这里是你的Python代码
+import numpy as np
+import matplotlib.pyplot as plt
+from skimage.data import shepp_logan_phantom
+from skimage.transform import radon, iradon
+
+# 创建模拟图像
+image = shepp_logan_phantom()
+
+# 计算投影数据（Radon 变换）
+theta = np.linspace(0., 180., max(image.shape), endpoint=False)
+sinogram = radon(image, theta=theta)
+
+# 使用 FBP 重建图像
+reconstruction_fbp = iradon(sinogram, theta=theta, filter_name='ramp')
+
+# 计算重建误差
+error = reconstruction_fbp - image
+print(f'FBP 重建均方根误差: {np.sqrt(np.mean(error**2)):.3g}')
+
+# 显示结果
+fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(12, 4.5))
+ax1.set_title("原始图像")
+ax1.imshow(image, cmap=plt.cm.Greys_r)
+ax2.set_title("正弦图 (Sinogram)")
+ax2.imshow(sinogram, cmap=plt.cm.Greys_r)
+ax3.set_title("FBP 重建")
+ax3.imshow(reconstruction_fbp, cmap=plt.cm.Greys_r)
+plt.tight_layout()
+plt.show()</code></pre>
+    </div>
+
+    <div class="code-block">
+        <h2>2. 深度学习U-Net</h2>
+        <pre><code class="language-python"># 这里是第二个代码块
+import numpy as np
+import tensorflow as tf
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Conv2D, MaxPooling2D, UpSampling2D
+from skimage.transform import radon, iradon
+
+# 数据生成函数
+def generate_data(n_samples=100, img_size=128):
+    images, sinograms, fbp_recons = [], [], []
+    for _ in range(n_samples):
+        img = shepp_logan_phantom()[:img_size, :img_size]
+        noise = np.random.normal(0, 0.05, img.shape)
+        img = np.clip(img + noise, 0, 1)
+        theta = np.linspace(0., 180., img_size, endpoint=False)
+        sino = radon(img, theta=theta)
+        fbp = iradon(sino, theta=theta)
+        images.append(img)
+        sinograms.append(sino)
+        fbp_recons.append(fbp)
+    return np.array(images), np.array(sinograms), np.array(fbp_recons)
+
+# 构建 U-Net 模型
+def build_unet(input_shape):
+    model = Sequential([
+        Conv2D(32, (3, 3), activation='relu', padding='same', input_shape=input_shape),
+        MaxPooling2D((2, 2)),
+        Conv2D(64, (3, 3), activation='relu', padding='same'),
+        MaxPooling2D((2, 2)),
+        Conv2D(64, (3, 3), activation='relu', padding='same'),
+        UpSampling2D((2, 2)),
+        Conv2D(32, (3, 3), activation='relu', padding='same'),
+        UpSampling2D((2, 2)),
+        Conv2D(1, (3, 3), activation='sigmoid', padding='same')
+    ])
+    model.compile(optimizer='adam', loss='mse')
+    return model
+
+# 训练和测试
+img_size = 128
+X, _, Y = generate_data(img_size=img_size)
+X = X.reshape(-1, img_size, img_size, 1)
+Y = Y.reshape(-1, img_size, img_size, 1)
+
+model = build_unet((img_size, img_size, 1))
+model.fit(X, Y, epochs=10, batch_size=4, validation_split=0.2)
+
+# 测试模型
+test_img = shepp_logan_phantom()[:img_size, :img_size]
+test_sino = radon(test_img, theta=np.linspace(0., 180., img_size, endpoint=False))
+test_fbp = iradon(test_sino, theta=np.linspace(0., 180., img_size, endpoint=False))
+prediction = model.predict(test_fbp.reshape(1, img_size, img_size, 1))[0, :, :, 0]
+
+# 显示结果
+plt.figure(figsize=(12, 4))
+plt.subplot(131).imshow(test_img, cmap='gray').set_title('原始图像')
+plt.subplot(132).imshow(test_fbp, cmap='gray').set_title('FBP 重建')
+plt.subplot(133).imshow(prediction, cmap='gray').set_title('深度学习重建')
+plt.tight_layout()
+plt.show()</code></pre>
+    </div>
+
+    <script>
+        // 启用代码高亮
+        document.addEventListener('DOMContentLoaded', (event) => {
+            hljs.highlightAll();
+        });
+    </script>
+</body>
+</html>
